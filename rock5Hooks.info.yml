@@ -1,0 +1,7 @@
+name: 'Rock5 getExperts Hooks'
+description: 'Test module for Drupal8.ovh'
+type: module
+core: 8.x
+varsion: 0.1-dev
+package: rock5Hooks
+

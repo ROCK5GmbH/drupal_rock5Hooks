@@ -1,0 +1,86 @@
+<?php
+
+use Drupal\file\FileInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\NodeInterface;
+
+
+/**
+ * Implements hook_help().
+ *
+ * Displays help and module information.
+ *
+ * @param path
+ *   Which path of the site we're using to display help
+ * @param arg
+ *   Array that holds the current path as returned from arg() function
+ *
+ * @return string
+ */
+function rock5Hooks_help($path, $arg) {
+  if ($path == "help.page.rock5Hooks") {
+    return '' . t("Hello, this module adds rock5 getExperts specific functionality by implementing some hooks") . '';
+  }
+}
+
+
+/**
+ * Converts the CV of a freelancer into plain text to make it searchable via search-api.
+ * Implements hook_node_presave.
+ *
+ * @param NodeInterface $node
+ */
+function rock5Hooks_node_presave(NodeInterface $node) {
+  if ($node->bundle() == 'freelancer') {
+
+    $file = $node->field_cv_anonymisiert->entity;
+
+    if ($file instanceof FileInterface) {
+
+      $filePath = \Drupal::service('file_system')->realpath($file->getFileUri());
+      $mimeType = $file->getMimeType();
+      $output   = [];
+      $exitCode = 0;
+
+      switch ($mimeType) {
+
+        // TODO: this is dangerous! Filename needs to be escaped somehow
+        // TODO: otherwise user can inject arbitrary bash-code into shell
+
+        // TODO: only convert to txt if file has been changed
+        // TODO: fix RTF to TXT conversion
+
+        case 'application/pdf':                                                         // pdf
+          exec(sprintf('pdftotext "%s" -', $filePath), $output, $exitCode);
+          break;
+        case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': // docx
+          exec(sprintf('docx2txt "%s" -', $filePath), $output, $exitCode);
+          break;
+        case 'application/msword':                                                      // doc
+          exec(sprintf('catdoc "%s"', $filePath), $output, $exitCode);
+          break;
+        //case 'application/rtf':                                                         // rtf
+        //  exec(sprintf('unrtf --text "%s"', $filePath), $output, $exitCode);
+        //  break;
+        case 'application/vnd.oasis.opendocument.text':                                 // odt
+          exec(sprintf('odt2txt "%s"', $filePath), $output, $exitCode);
+          break;
+        default:
+          \Drupal::logger('rock5Hooks')->error(sprintf(
+             'CV file of freelancer has unexpected mimetype "%s"',
+             $mimeType
+           ));
+          break;
+      }
+
+      if (!empty($output)) {
+        $node->field_cv_plain->value = implode(' ', $output);
+      }
+
+    } elseif ($file == NULL) {
+      $node->field_cv_plain->value = '';
+    }
+    
+  }
+}
+
